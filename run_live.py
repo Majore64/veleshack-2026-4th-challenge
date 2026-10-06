@@ -41,7 +41,7 @@ def run_bot(name: str, strategy_fn, port: int = 8080):
 
 def run_my_agent(port: int = 8080):
     time.sleep(2.5)  # wait for arena boot
-    team_name = os.environ.get("TEAM_NAME", "team-cogni-vitor")
+    team_name = os.environ.get("TEAM_NAME", "vitor64")
     run_strategy(decide_bid, f"http://127.0.0.1:{port}", team_name)
 
 

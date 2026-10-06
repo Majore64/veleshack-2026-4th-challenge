@@ -223,7 +223,7 @@ installed by hand actually in `requirements.txt`. Run `make check` first.
 
 ## Team Submission & Strategy Insight Report
 
-**Team:** `team-cogni-vitor` | **Author:** Vitor | **Artifact:** `agent-template/Dockerfile`
+**Team:** `vitor64` | **Author:** Vitor | **Artifact:** `agent-template/Dockerfile`
 
 ### 1. Strategy Formulation
 Our agent, **CogniOptimal v3**, solves decentralized edge resource allocation via three principled mechanisms:
