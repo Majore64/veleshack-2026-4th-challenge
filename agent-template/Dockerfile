@@ -26,6 +26,6 @@ USER agent
 # Both are supplied by docker-compose (or by the grading harness). Do not
 # hardcode them anywhere in your code - it is worth points.
 ENV ARENA_URL=http://arena:8080 \
-    TEAM_NAME=unnamed-team
+    TEAM_NAME=vitor64
 
 CMD ["python", "-u", "agent.py"]

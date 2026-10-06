@@ -39,7 +39,7 @@ from strategy import decide_bid
 LOG = logging.getLogger("agent")
 
 ARENA_URL = os.environ.get("ARENA_URL", "http://localhost:8080")
-TEAM_NAME = os.environ.get("TEAM_NAME", "unnamed-team")
+TEAM_NAME = os.environ.get("TEAM_NAME", "vitor64")
 
 _stop = threading.Event()
 
