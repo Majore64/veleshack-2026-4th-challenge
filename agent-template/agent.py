@@ -227,8 +227,9 @@ def _collect_result(client: ArenaClient, history: List[Dict[str, Any]],
     """Pull the last settled result into history. Best-effort, never blocking."""
     if last_result_round >= last_bid_round or last_bid_round == 0:
         return
+    target_round = last_result_round + 1
     try:
-        result = client.get_result(last_bid_round)
+        result = client.get_result(target_round)
     except (NoRound, ArenaClientError):
         return
     if not result.get("participated"):

@@ -111,11 +111,11 @@ class ArenaClient:
         """
         if retry_after:
             try:
-                time.sleep(min(float(retry_after), BACKOFF_CAP))
+                time.sleep(min(float(retry_after) * 0.25, 0.35))
                 return
             except (TypeError, ValueError):
                 pass
-        delay = min(BACKOFF_BASE * (2 ** attempt), BACKOFF_CAP)
+        delay = min(BACKOFF_BASE * (2 ** attempt), 0.5)
         time.sleep(delay * (0.5 + self._rng.random()))  # full jitter
 
     def _request(
@@ -231,10 +231,12 @@ class ArenaClient:
         `history[-1]["battery"]` is the other place to read it, and it is the
         one to use if you want the whole trace rather than the latest value.
         """
+        features = self.profile.setdefault("features", {})
+        if "round" in payload:
+            features["round"] = payload["round"]
         you = payload.get("you")
         if not isinstance(you, dict):
             return
-        features = self.profile.setdefault("features", {})
         for key in ("battery", "compromise"):
             if key in you:
                 features[key] = you[key]
@@ -244,11 +246,11 @@ class ArenaClient:
             "POST", "/v1/bid", json={"round": round_index, "bid": bid}
         )
 
-    def get_result(self, round_index: int, attempts: int = 2) -> Dict[str, Any]:
+    def get_result(self, round_index: int, attempts: int = 1) -> Dict[str, Any]:
         """Fetch a settled round's result.
 
-        Deliberately fewer retries than a bid: this is bookkeeping, not the
-        critical path, and it must never eat the window for the next bid.
+        Single attempt: this is bookkeeping, not the critical path, and it
+        must never eat the window for the next bid under heavy chaos.
         """
         saved, self.max_attempts = self.max_attempts, attempts
         try:

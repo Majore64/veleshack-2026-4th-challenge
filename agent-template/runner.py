@@ -141,15 +141,16 @@ def run_strategy(
             # round. Nothing that can block goes in front of the bid.
             if round_index <= last_bid_round or rnd.get("settled"):
                 if last_result_round < last_bid_round and last_bid_round:
+                    target = last_result_round + 1
                     try:
-                        result = client.get_result(last_bid_round)
+                        result = client.get_result(target)
                         if result.get("participated") and not (
                             history and history[-1].get("round") == result.get("round")
                         ):
                             history.append(result)
                             if on_result:
                                 on_result(result)
-                        last_result_round = last_bid_round
+                        last_result_round = target
                     except (NoRound, ArenaClientError):
                         pass
                 stop.wait(0.2)

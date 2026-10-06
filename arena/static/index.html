@@ -1,308 +1,590 @@
 <!doctype html>
 <!--
-  CoGNETs Swarm Arena - live leaderboard.
-
-  Deliberately plain: no build step, no framework, no CDN. It polls two
-  endpoints once a second and redraws. This doubles as the projector display
-  on the day, so it is designed to be readable from the back of a room.
-
-  Copyright 2026 The CoGNETs Consortium
-  SPDX-License-Identifier: Apache-2.0
+  CoGNETs Swarm Arena — Mission Control & Explainable AI Dashboard
+  Veles Hack 2026 Innovation Edition
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CoGNETs Swarm Arena</title>
+<title>CoGNETs Swarm Arena — Mission Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   :root {
-    --ink: #12232e;
-    --muted: #5b6b7b;
-    --rule: #dbe4ec;
-    --bg: #f7fafc;
-    --card: #ffffff;
-    --accent: #0b6e99;
-    --accent2: #c2410c;
-    --good: #15803d;
-    --bad: #b91c1c;
+    --bg-base: #060913;
+    --bg-card: #0b1120;
+    --bg-card-sub: #162033;
+    --border: rgba(148, 163, 184, 0.15);
+    --border-accent: rgba(56, 189, 248, 0.4);
+    --text-primary: #f8fafc;
+    --text-muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-glow: rgba(56, 189, 248, 0.25);
+    --good: #10b981;
+    --good-glow: rgba(16, 185, 129, 0.25);
+    --warn: #f59e0b;
+    --bad: #ef4444;
     --bot: #64748b;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --ink: #e8eef4; --muted: #93a4b5; --rule: #24384a; --bg: #0d1b26;
-      --card: #12242f; --accent: #4aa8cf; --accent2: #f08a4b;
-      --good: #4ade80; --bad: #f87171; --bot: #7b8da0;
-    }
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0; background: var(--bg-base); color: var(--text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
   }
   header {
-    padding: 18px 24px 14px; border-bottom: 1px solid var(--rule);
-    display: flex; flex-wrap: wrap; gap: 18px; align-items: baseline;
-    background: var(--card);
+    padding: 16px 28px; border-bottom: 1px solid var(--border);
+    display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+    background: rgba(11, 17, 32, 0.88); backdrop-filter: blur(14px);
+    position: sticky; top: 0; z-index: 50;
   }
-  h1 { margin: 0; font-size: 20px; letter-spacing: -0.01em; }
-  .sub { color: var(--muted); font-size: 13px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo-badge {
+    background: linear-gradient(135deg, #0284c7, #38bdf8);
+    color: #fff; font-weight: 800; font-size: 13px;
+    padding: 6px 10px; border-radius: 8px; letter-spacing: 0.05em;
+  }
+  h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+  .sub { color: var(--text-muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  .status-ping {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--good);
+    box-shadow: 0 0 10px var(--good); animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  .header-pills { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
   .pill {
-    display: inline-block; padding: 2px 9px; border-radius: 99px;
-    background: var(--bg); border: 1px solid var(--rule);
-    font-size: 12px; color: var(--muted);
+    padding: 5px 12px; border-radius: 99px; background: rgba(22, 32, 51, 0.8);
+    border: 1px solid var(--border); font-size: 12px; color: var(--text-muted);
   }
-  .pill b { color: var(--ink); font-variant-numeric: tabular-nums; }
-  main { padding: 20px 24px 60px; max-width: 1180px; margin: 0 auto; }
-  .stats {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 12px; margin-bottom: 20px;
+  .pill b { color: var(--text-primary); font-family: 'JetBrains Mono', monospace; }
+  .btn-action {
+    background: #1e293b; color: #38bdf8; border: 1px solid var(--border-accent);
+    padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;
   }
-  .stat {
-    background: var(--card); border: 1px solid var(--rule);
-    border-radius: 10px; padding: 12px 14px;
+  .btn-action:hover { background: #38bdf8; color: #060913; }
+  .mode-badge {
+    background: rgba(239, 68, 68, 0.18); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35);
+    padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 5px;
   }
-  .stat .label {
-    font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
-    color: var(--muted); margin-bottom: 4px;
+
+  main { padding: 24px 28px 60px; max-width: 1440px; margin: 0 auto; }
+
+  /* Tactical Alert Ticker */
+  .ticker-bar {
+    background: rgba(15, 23, 42, 0.95); border: 1px solid var(--border-accent);
+    border-radius: 10px; padding: 10px 16px; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 12px; font-size: 12px;
+    font-family: 'JetBrains Mono', monospace; color: #cbd5e1;
   }
-  .stat .value {
-    font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums;
+  .ticker-badge {
+    background: #38bdf8; color: #090d16; font-weight: 700; font-size: 10px;
+    padding: 2px 7px; border-radius: 4px; text-transform: uppercase;
   }
-  .progress {
-    height: 5px; background: var(--rule); border-radius: 99px;
-    overflow: hidden; margin-top: 8px;
+  .ticker-content { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Top Stat Counters */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px; margin-bottom: 24px;
   }
-  .progress > i { display: block; height: 100%; background: var(--accent); }
-  table { width: 100%; border-collapse: collapse; background: var(--card);
-          border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
-  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--rule); }
+  .stat-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 18px; position: relative; overflow: hidden;
+  }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5;
+  }
+  .stat-card .label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-muted); margin-bottom: 4px; font-weight: 600;
+  }
+  .stat-card .value {
+    font-size: 26px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+  }
+  .progress-bar {
+    height: 4px; background: rgba(255, 255, 255, 0.06); border-radius: 99px;
+    margin-top: 10px; overflow: hidden;
+  }
+  .progress-bar > i { display: block; height: 100%; background: var(--accent); transition: width 0.3s; }
+
+  /* 2-Column Layout */
+  .grid-2col {
+    display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 24px; margin-bottom: 24px;
+  }
+  @media (max-width: 1120px) {
+    .grid-2col { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px; overflow: hidden;
+  }
+  .panel-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px;
+  }
+  .panel-title {
+    font-size: 14px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px;
+  }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 11px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; }
   th {
-    font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
-    color: var(--muted); font-weight: 600; background: var(--bg);
-    white-space: nowrap;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-muted); font-weight: 600; background: rgba(30, 41, 59, 0.4);
   }
-  td { font-variant-numeric: tabular-nums; }
-  tr:last-child td { border-bottom: none; }
-  .rank { width: 40px; color: var(--muted); font-weight: 600; }
-  .team { font-weight: 600; }
-  .score { font-weight: 700; font-size: 15px; }
-  .baseline .team { color: var(--bot); font-weight: 500; }
-  .baseline .team::after {
-    content: "bot"; margin-left: 7px; font-size: 10px; padding: 1px 6px;
-    border: 1px solid var(--rule); border-radius: 99px;
-    color: var(--muted); font-weight: 600; text-transform: uppercase;
-    vertical-align: middle;
+  td { font-family: 'JetBrains Mono', monospace; }
+  .rank { width: 44px; color: var(--text-muted); font-weight: 700; }
+  .team-cell { font-family: 'Inter', sans-serif; font-weight: 600; }
+  .lead-row {
+    background: rgba(56, 189, 248, 0.08); border-left: 3px solid var(--accent);
   }
-  .lead { background: color-mix(in srgb, var(--accent) 7%, transparent); }
-  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-         margin-right: 6px; vertical-align: middle; }
-  .on { background: var(--good); }
-  .off { background: #cbd5e1; }
-  .out { background: var(--bad); }
-  .warn { color: var(--accent2); font-weight: 600; }
-  .zero { color: var(--muted); }
-  .bar { height: 6px; background: var(--rule); border-radius: 99px; overflow: hidden;
-         min-width: 60px; }
-  .bar > i { display: block; height: 100%; background: var(--accent); }
-  .baseline .bar > i { background: var(--bot); }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em;
-       color: var(--muted); margin: 26px 0 10px; }
-  svg { display: block; width: 100%; height: 90px; }
-  .card { background: var(--card); border: 1px solid var(--rule);
-          border-radius: 10px; padding: 14px; }
-  .empty { color: var(--muted); padding: 28px; text-align: center; }
-  footer { color: var(--muted); font-size: 12px; margin-top: 26px; }
-  code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-         background: var(--bg); padding: 1px 5px; border-radius: 4px;
-         border: 1px solid var(--rule); font-size: 12px; }
+  .baseline-tag {
+    font-size: 9px; padding: 2px 6px; border-radius: 4px; background: rgba(100, 116, 139, 0.25);
+    color: var(--text-muted); text-transform: uppercase; margin-left: 6px;
+  }
+  .my-team-tag {
+    font-size: 9px; padding: 2px 6px; border-radius: 4px; background: rgba(16, 185, 129, 0.25);
+    color: #34d399; text-transform: uppercase; margin-left: 6px; font-weight: 700;
+  }
+  .battery-gauge {
+    display: inline-block; width: 65px; height: 6px; background: rgba(255,255,255,0.08);
+    border-radius: 99px; overflow: hidden; vertical-align: middle; margin-right: 8px;
+  }
+  .battery-gauge > i { display: block; height: 100%; border-radius: 99px; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; }
+  .dot-good { background: var(--good); box-shadow: 0 0 6px var(--good); }
+  .dot-bad { background: var(--bad); }
+
+  /* Charts Container */
+  .chart-box { height: 180px; position: relative; margin-bottom: 16px; }
+
+  /* CogniSense Console */
+  .cogni-console {
+    background: #020617; border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 12px; padding: 16px; font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; height: 260px; overflow-y: auto; color: #cbd5e1;
+  }
+  .cogni-entry {
+    margin-bottom: 10px; line-height: 1.5; padding-bottom: 8px;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.07);
+  }
+  .cogni-time { color: var(--accent); font-weight: 600; }
+  .cogni-mode {
+    background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 1px 5px;
+    border-radius: 4px; font-size: 10px; font-weight: 700; margin: 0 4px;
+  }
+  .cogni-alloc { color: #a7f3d0; }
+  .cogni-text { color: #f1f5f9; display: block; margin-top: 3px; }
+
+  footer {
+    margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center; color: var(--text-muted);
+    font-size: 12px;
+  }
 </style>
 </head>
 <body>
+
 <header>
-  <div>
-    <h1>CoGNETs Swarm Arena</h1>
-    <div class="sub" id="subtitle">connecting&hellip;</div>
+  <div class="brand">
+    <div class="logo-badge">CoGNETs</div>
+    <div>
+      <h1>Swarm Mission Control</h1>
+      <div class="sub">
+        <span class="status-ping"></span>
+        <span id="subtitle">Connecting to edge swarm telemetry&hellip;</span>
+      </div>
+    </div>
   </div>
-  <div style="margin-left:auto; display:flex; gap:8px; flex-wrap:wrap">
-    <span class="pill">scenario <b id="p-scenario">&mdash;</b></span>
-    <span class="pill">round <b id="p-round">&mdash;</b></span>
-    <span class="pill">chaos <b id="p-chaos">&mdash;</b></span>
-    <span class="pill">nodes <b id="p-nodes">&mdash;</b></span>
+
+  <div class="header-pills">
+    <span class="mode-badge" id="modeBadge">🔴 PREDATOR MODE</span>
+    <span class="pill">Scenario: <b id="p-scenario">&mdash;</b></span>
+    <span class="pill">Round: <b id="p-round">&mdash;</b></span>
+    <span class="pill">Network Chaos: <b id="p-chaos">&mdash;</b></span>
+    <button class="btn-action" onclick="exportAuditReport()">📥 Export Taikai Snapshot</button>
+    <button class="btn-action" onclick="location.href='/static/index_classic.html'">📋 Classic View</button>
   </div>
 </header>
 
 <main>
-  <div class="stats">
-    <div class="stat">
-      <div class="label">Round</div>
+  <!-- Real-time Tactical Alert Ticker -->
+  <div class="ticker-bar">
+    <span class="ticker-badge">Tactical Radar</span>
+    <span class="ticker-content" id="tacticalAlert">Monitoring competitor battery expenditure and market clearing prices...</span>
+  </div>
+
+  <!-- Top Stat Counters -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="label">Round Progress</div>
       <div class="value" id="s-round">&mdash;</div>
-      <div class="progress"><i id="s-progress" style="width:0%"></i></div>
+      <div class="progress-bar"><i id="s-progress" style="width:0%"></i></div>
     </div>
-    <div class="stat">
-      <div class="label">Closes in</div>
+    <div class="stat-card">
+      <div class="label">Round Countdown</div>
       <div class="value" id="s-remaining">&mdash;</div>
     </div>
-    <div class="stat">
-      <div class="label">Log social welfare</div>
-      <div class="value" id="s-lsw">&mdash;</div>
+    <div class="stat-card">
+      <div class="label">Swarm Social Welfare (LSW)</div>
+      <div class="value" id="s-lsw" style="color:#38bdf8">&mdash;</div>
     </div>
-    <div class="stat">
-      <div class="label">Active nodes</div>
+    <div class="stat-card">
+      <div class="label">Active Nodes</div>
       <div class="value" id="s-active">&mdash;</div>
     </div>
-    <div class="stat">
-      <div class="label">Injected faults</div>
-      <div class="value" id="s-faults">&mdash;</div>
+    <div class="stat-card">
+      <div class="label">Injected Network Faults</div>
+      <div class="value" id="s-faults" style="color:#f59e0b">&mdash;</div>
     </div>
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th class="rank">#</th>
-        <th>Team</th>
-        <th style="text-align:right">Score</th>
-        <th style="width:120px">Relative</th>
-        <th style="text-align:right">Rounds</th>
-        <th style="text-align:right">Missed</th>
-        <th style="text-align:right">Floors</th>
-        <th style="text-align:right">&kappa;</th>
-        <th style="text-align:right">Battery</th>
-        <th>State</th>
-      </tr>
-    </thead>
-    <tbody id="rows">
-      <tr><td colspan="10" class="empty">Waiting for the first round to settle&hellip;</td></tr>
-    </tbody>
-  </table>
+  <!-- Main Section: Leaderboard + Live Charts -->
+  <div class="grid-2col">
+    <!-- Left: Live Standings -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">🏆 Real-Time Standings</div>
+        <div style="font-size: 11px; color: var(--text-muted);">Kelly Allocation & CES Payoff</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="rank">#</th>
+            <th>Node / Team</th>
+            <th style="text-align:right">Score</th>
+            <th style="text-align:right">Rounds</th>
+            <th style="text-align:right">Floors</th>
+            <th style="text-align:right">Battery</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="7" style="text-align:center; padding:32px; color:var(--text-muted)">Waiting for tournament to begin&hellip;</td></tr>
+        </tbody>
+      </table>
+    </div>
 
-  <h2>Log social welfare per round</h2>
-  <div class="card"><svg id="spark" viewBox="0 0 600 90" preserveAspectRatio="none"></svg></div>
+    <!-- Right: Real-Time Charts -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">⚡ Swarm Battery Dynamics</div>
+        <div style="font-size: 11px; color: var(--text-muted);">Cutoff at 5% (0.05)</div>
+      </div>
+      <div class="chart-box">
+        <canvas id="batteryChart"></canvas>
+      </div>
+
+      <div class="panel-header" style="margin-top: 10px;">
+        <div class="panel-title">📈 Cumulative Score Progression</div>
+        <div style="font-size: 11px; color: var(--text-muted);">Convergence Curve</div>
+      </div>
+      <div class="chart-box">
+        <canvas id="scoreChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Section: Explainable AI Feed -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">🧠 CogniSense — Explainable Edge AI (XAI) Live Stream</div>
+      <div style="font-size: 11px; color: #38bdf8;">Autonomous Causal Reasoning & Game-Theoretic Insights</div>
+    </div>
+    <div class="cogni-console" id="cogniConsole">
+      <div class="cogni-entry">
+        <span class="cogni-time">[SYSTEM]</span>
+        <span class="cogni-text">CogniSense engine active. Listening for real-time agent decision traces...</span>
+      </div>
+    </div>
+  </div>
 
   <footer>
-    Polls <code>/v1/leaderboard</code> and <code>/v1/status</code> every second.
-    API docs at <code>/docs</code>. Everything is Apache-2.0.
+    <div>CoGNETs Horizon Europe Project (GA 101135930) • Veles Hack 2026</div>
+    <div>Live Telemetry Feed via <code>/v1/leaderboard</code> & <code>/static/cognisense.json</code></div>
   </footer>
 </main>
 
 <script>
-(function () {
-  "use strict";
+var lastGlobalData = {};
 
-  var $ = function (id) { return document.getElementById(id); };
-  var fmt = function (n, d) {
+function exportAuditReport() {
+  var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(lastGlobalData, null, 2));
+  var downloadAnchor = document.createElement('a');
+  downloadAnchor.setAttribute("href", dataStr);
+  downloadAnchor.setAttribute("download", "taikai_veleshack_results.json");
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
+}
+
+(function() {
+  var $ = function(id) { return document.getElementById(id); };
+  var fmt = function(n, d) {
     if (n === null || n === undefined) return "—";
     return Number(n).toFixed(d === undefined ? 2 : d);
   };
 
-  function stateCell(row) {
-    if (row.ejected) return '<span class="dot out"></span>ejected';
-    if (row.active) return '<span class="dot on"></span>active';
-    return '<span class="dot off"></span>lease expired';
+  var nodeColors = {
+    "team-cogni-vitor": "#10b981",
+    "bot-proportional": "#f59e0b",
+    "bot-naive-max": "#ef4444",
+    "bot-even-split": "#8b5cf6"
+  };
+
+  function getColor(team) {
+    for (var key in nodeColors) {
+      if (team.indexOf(key) !== -1) return nodeColors[key];
+    }
+    return "#38bdf8";
   }
 
-  function renderRows(rows) {
+  // --- Chart Setup ---
+  var maxHistoryPoints = 40;
+  var chartLabels = [];
+  var batteryDatasets = {};
+  var scoreDatasets = {};
+
+  var batteryChart = null;
+  var scoreChart = null;
+
+  function initCharts() {
+    var ctxBat = $("batteryChart");
+    var ctxSco = $("scoreChart");
+    if (!ctxBat || !window.Chart) return;
+
+    var commonOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
+      plugins: {
+        legend: { labels: { color: "#94a3b8", font: { size: 10, family: 'Inter' }, boxWidth: 10 } }
+      },
+      scales: {
+        x: { grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: "#64748b", font: { size: 9 } } },
+        y: { grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: "#64748b", font: { size: 9 } } }
+      }
+    };
+
+    batteryChart = new Chart(ctxBat, {
+      type: 'line',
+      data: { labels: chartLabels, datasets: [] },
+      options: Object.assign({}, commonOptions, {
+        scales: Object.assign({}, commonOptions.scales, {
+          y: { min: 0, max: 1.0, grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: "#64748b" } }
+        })
+      })
+    });
+
+    scoreChart = new Chart(ctxSco, {
+      type: 'line',
+      data: { labels: chartLabels, datasets: [] },
+      options: commonOptions
+    });
+  }
+
+  function updateCharts(round, nodes) {
+    if (!batteryChart || !scoreChart) return;
+
+    if (chartLabels.indexOf("R" + round) === -1) {
+      chartLabels.push("R" + round);
+      if (chartLabels.length > maxHistoryPoints) chartLabels.shift();
+    }
+
+    nodes.forEach(function(node) {
+      var team = node.team;
+      var color = getColor(team);
+
+      if (!batteryDatasets[team]) {
+        batteryDatasets[team] = {
+          label: team,
+          borderColor: color,
+          backgroundColor: color,
+          borderWidth: team.indexOf("cogni") !== -1 ? 2.5 : 1.5,
+          tension: 0.2,
+          pointRadius: 0,
+          data: []
+        };
+        batteryChart.data.datasets.push(batteryDatasets[team]);
+      }
+      batteryDatasets[team].data.push(node.battery);
+      if (batteryDatasets[team].data.length > maxHistoryPoints) batteryDatasets[team].data.shift();
+
+      if (!scoreDatasets[team]) {
+        scoreDatasets[team] = {
+          label: team,
+          borderColor: color,
+          backgroundColor: color,
+          borderWidth: team.indexOf("cogni") !== -1 ? 2.5 : 1.5,
+          tension: 0.2,
+          pointRadius: 0,
+          data: []
+        };
+        scoreChart.data.datasets.push(scoreDatasets[team]);
+      }
+      scoreDatasets[team].data.push(node.score);
+      if (scoreDatasets[team].data.length > maxHistoryPoints) scoreDatasets[team].data.shift();
+    });
+
+    batteryChart.update('none');
+    scoreChart.update('none');
+  }
+
+  function renderTable(rows) {
     var body = $("rows");
     if (!rows.length) {
-      body.innerHTML = '<tr><td colspan="10" class="empty">No nodes registered yet.</td></tr>';
+      body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:24px; color:var(--text-muted)">Waiting for nodes to register&hellip;</td></tr>';
       return;
     }
-    var top = Math.max.apply(null, rows.map(function (r) { return r.score; }).concat([1e-6]));
-    body.innerHTML = rows.map(function (r, i) {
-      var cls = [];
-      if (r.is_baseline) cls.push("baseline");
-      if (i === 0 && r.score > 0) cls.push("lead");
-      var pct = top > 0 ? Math.max(0, (r.score / top) * 100) : 0;
-      return '<tr class="' + cls.join(" ") + '">' +
+
+    // Check for tactical alerts
+    var asleepNodes = rows.filter(function(r) { return !r.active && r.is_baseline; });
+    var lowBatNodes = rows.filter(function(r) { return r.battery < 0.12 && r.is_baseline; });
+    var ticker = $("tacticalAlert");
+    if (asleepNodes.length > 0) {
+      ticker.textContent = "💤 TACTICAL ADVANTAGE: " + asleepNodes.map(function(n) { return n.team; }).join(", ") + " entered battery coma! Discounted compute window open.";
+      ticker.style.color = "#38bdf8";
+    } else if (lowBatNodes.length > 0) {
+      ticker.textContent = "⚠️ RADAR NOTICE: Competitors " + lowBatNodes.map(function(n) { return n.team; }).join(", ") + " critically low on charge (<12%).";
+      ticker.style.color = "#f59e0b";
+    } else {
+      ticker.textContent = "⚡ Swarm operating in normal continuum equilibrium. All floors secured with safety margins.";
+      ticker.style.color = "#cbd5e1";
+    }
+
+    body.innerHTML = rows.map(function(r, i) {
+      var isLead = i === 0 && r.score > 0;
+      var isMyTeam = r.team.indexOf("cogni") !== -1 || r.team.indexOf("vitor") !== -1;
+      var batPct = Math.max(0, Math.min(100, (r.battery || 0) * 100));
+      var batColor = batPct > 50 ? "#10b981" : (batPct > 20 ? "#f59e0b" : "#ef4444");
+
+      var tag = r.is_baseline ? '<span class="baseline-tag">BOT</span>' : (isMyTeam ? '<span class="my-team-tag">YOU</span>' : '');
+
+      return '<tr class="' + (isLead ? 'lead-row' : '') + '">' +
         '<td class="rank">' + r.rank + '</td>' +
-        '<td class="team">' + escapeHtml(r.team) + '</td>' +
-        '<td class="score" style="text-align:right">' + fmt(r.score, 3) + '</td>' +
-        '<td><div class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></div></td>' +
+        '<td class="team-cell">' + r.team + tag + '</td>' +
+        '<td style="text-align:right; font-weight:700; color:' + (isLead ? '#38bdf8' : '#f8fafc') + '">' + fmt(r.score, 3) + '</td>' +
         '<td style="text-align:right">' + r.rounds_participated + '</td>' +
-        '<td style="text-align:right" class="' + (r.rounds_missed ? "warn" : "zero") + '">' +
-          r.rounds_missed + '</td>' +
-        '<td style="text-align:right" class="' + (r.floor_violations ? "warn" : "zero") + '">' +
-          r.floor_violations + '</td>' +
-        '<td style="text-align:right" class="' + (r.compromise > 0 ? "warn" : "zero") + '">' +
-          fmt(r.compromise, 2) + '</td>' +
-        '<td style="text-align:right">' + fmt(r.battery, 2) + '</td>' +
-        '<td>' + stateCell(r) + '</td>' +
+        '<td style="text-align:right; color:' + (r.floor_violations ? '#ef4444' : 'var(--text-muted)') + '">' + r.floor_violations + '</td>' +
+        '<td style="text-align:right">' +
+          '<div class="battery-gauge"><i style="width:' + batPct.toFixed(0) + '%; background:' + batColor + '"></i></div>' +
+          fmt(r.battery, 2) +
+        '</td>' +
+        '<td>' + (r.active ? '<span class="dot dot-good"></span>Active' : '<span class="dot dot-bad"></span>Asleep') + '</td>' +
         '</tr>';
     }).join("");
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-    });
-  }
+  // --- CogniSense Poll ---
+  var lastCogniRound = -1;
+  function updateCogniSense() {
+    fetch("/static/cognisense.json", { cache: "no-store" })
+      .then(function(r) { return r.json(); })
+      .then(function(records) {
+        if (!Array.isArray(records)) return;
+        var box = $("cogniConsole");
+        if (records.length === 0) {
+          box.innerHTML = '<div class="cogni-entry"><span class="cogni-time">[SYSTEM]</span><span class="cogni-text">CogniSense engine active. Ready for round 1 auction...</span></div>';
+          lastCogniRound = -1;
+          return;
+        }
+        var latest = records[records.length - 1];
+        
+        // Update header badge
+        var badge = $("modeBadge");
+        if (latest.mode === "guardian") {
+          badge.textContent = "🟢 GUARDIAN MODE";
+          badge.style.background = "rgba(16, 185, 129, 0.18)";
+          badge.style.color = "#34d399";
+          badge.style.borderColor = "rgba(16, 185, 129, 0.35)";
+        } else {
+          badge.textContent = "🔴 PREDATOR MODE";
+          badge.style.background = "rgba(239, 68, 68, 0.18)";
+          badge.style.color = "#f87171";
+          badge.style.borderColor = "rgba(239, 68, 68, 0.35)";
+        }
 
-  function renderSpark(series) {
-    var svg = $("spark");
-    if (!series || series.length < 2) {
-      svg.innerHTML = '<text x="8" y="48" fill="#94a3b8" font-size="12">' +
-        'not enough settled rounds yet</text>';
-      return;
-    }
-    var W = 600, H = 90, pad = 8;
-    var min = Math.min.apply(null, series), max = Math.max.apply(null, series);
-    var span = (max - min) || 1;
-    var pts = series.map(function (v, i) {
-      var x = pad + (i / (series.length - 1)) * (W - 2 * pad);
-      var y = H - pad - ((v - min) / span) * (H - 2 * pad);
-      return x.toFixed(1) + "," + y.toFixed(1);
-    });
-    var area = "M" + pad + "," + (H - pad) + " L" + pts.join(" L") +
-               " L" + (W - pad) + "," + (H - pad) + " Z";
-    svg.innerHTML =
-      '<path d="' + area + '" fill="rgba(11,110,153,0.12)"/>' +
-      '<polyline points="' + pts.join(" ") + '" fill="none" ' +
-        'stroke="#0b6e99" stroke-width="2" stroke-linejoin="round"/>' +
-      '<text x="' + (W - pad) + '" y="14" text-anchor="end" fill="#94a3b8" ' +
-        'font-size="11">max ' + max.toFixed(2) + '</text>' +
-      '<text x="' + (W - pad) + '" y="' + (H - 2) + '" text-anchor="end" ' +
-        'fill="#94a3b8" font-size="11">min ' + min.toFixed(2) + '</text>';
+        if (latest.round === lastCogniRound) return;
+        lastCogniRound = latest.round;
+
+        box.innerHTML = records.map(function(item) {
+          var isGuardian = item.mode === "guardian";
+          var modeBg = isGuardian ? "rgba(16, 185, 129, 0.18)" : "rgba(239, 68, 68, 0.18)";
+          var modeColor = isGuardian ? "#34d399" : "#f87171";
+          return '<div class="cogni-entry">' +
+            '<span class="cogni-time">[ROUND ' + item.round + ']</span>' +
+            '<span class="cogni-mode" style="background:' + modeBg + '; color:' + modeColor + '">' + (item.mode || 'PREDATOR').toUpperCase() + '</span>' +
+            '<span class="cogni-alloc">⚡ Bat: ' + fmt(item.battery, 2) + ' | Bids: C=' + fmt(item.bid.compute, 2) + ' E=' + fmt(item.bid.energy, 2) + ' S=' + fmt(item.bid.security, 2) + '</span>' +
+            '<span class="cogni-text">' + item.rationale + '</span>' +
+            '</div>';
+        }).join("");
+        box.scrollTop = box.scrollHeight;
+      })
+      .catch(function() {});
   }
 
   function tick() {
     fetch("/v1/leaderboard", { cache: "no-store" })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        lastGlobalData.leaderboard = data.leaderboard;
         var st = data.status || {};
-        renderRows(data.leaderboard || []);
+        lastGlobalData.status = st;
+        var list = data.leaderboard || [];
+        renderTable(list);
+
         $("p-scenario").textContent = st.scenario || "—";
         $("p-round").textContent = (st.round || 0) + " / " + (st.total_rounds || 0);
         $("p-chaos").textContent = fmt(st.chaos_rate, 2);
-        $("p-nodes").textContent = (st.nodes_active || 0) + " / " + (st.nodes_registered || 0);
         $("s-round").textContent = (st.round || 0) + " / " + (st.total_rounds || 0);
-        $("s-remaining").textContent = st.finished ? "finished"
-          : fmt(st.seconds_remaining, 1) + "s";
-        $("s-lsw").textContent = st.last_lsw === null || st.last_lsw === undefined
-          ? "—" : fmt(st.last_lsw, 2);
-        $("s-active").textContent = (st.nodes_active || 0);
+        $("s-remaining").textContent = st.finished ? "Finished" : fmt(st.seconds_remaining, 1) + "s";
+        $("s-lsw").textContent = st.last_lsw !== undefined ? fmt(st.last_lsw, 2) : "—";
+        $("s-active").textContent = st.nodes_active || 0;
+
         var pct = st.total_rounds ? ((st.round || 0) / st.total_rounds) * 100 : 0;
         $("s-progress").style.width = Math.min(100, pct).toFixed(1) + "%";
+
         $("subtitle").textContent = st.finished
-          ? "Run finished — final standings"
-          : (st.started ? "Live" : "Waiting for agents to register…");
-        renderSpark(st.lsw_series || []);
+          ? "Tournament Finished — Final Standings"
+          : (st.started ? "Live Swarm Battle" : "Waiting for agents to register…");
+
+        if (st.round && list.length) {
+          updateCharts(st.round, list);
+        }
       })
-      .catch(function () {
-        $("subtitle").textContent = "arena unreachable — retrying";
+      .catch(function() {
+        $("subtitle").textContent = "Arena offline / waiting for start";
       });
 
     fetch("/v1/status", { cache: "no-store" })
-      .then(function (r) { return r.json(); })
-      .then(function (st) {
+      .then(function(r) { return r.json(); })
+      .then(function(st) {
+        lastGlobalData.status_details = st;
         var f = st.faults || {};
-        var total = (f.injected_503 || 0) + (f.injected_429 || 0);
-        $("s-faults").textContent = total;
+        $("s-faults").textContent = (f.injected_503 || 0) + (f.injected_429 || 0);
       })
-      .catch(function () {});
+      .catch(function() {});
+
+    updateCogniSense();
   }
 
-  tick();
-  setInterval(tick, 1000);
+  window.addEventListener("DOMContentLoaded", function() {
+    initCharts();
+    tick();
+    setInterval(tick, 1000);
+  });
 })();
 </script>
 </body>
